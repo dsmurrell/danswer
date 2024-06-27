@@ -1,7 +1,7 @@
 import re
 from collections.abc import Callable
 from collections.abc import Generator
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import timezone
 from typing import Any
 from typing import cast
@@ -354,16 +354,21 @@ class SlackPollConnector(PollConnector):
         if self.client is None:
             raise ConnectorMissingCredentialError("Slack")
 
+        # Calculate the timestamp for two years ago from the current time
+        two_years_ago = datetime.now() - timedelta(days=2*365)
+        two_years_ago_timestamp = int(two_years_ago.timestamp())
+
+        # Determine the actual start time, ensuring it's no older than two years ago
+        actual_start = max(two_years_ago_timestamp, start) if start else two_years_ago_timestamp
+
         documents: list[Document] = []
         for document in get_all_docs(
             client=self.client,
             workspace=self.workspace,
             channels=self.channels,
             channel_name_regex_enabled=self.channel_regex_enabled,
-            # NOTE: need to impute to `None` instead of using 0.0, since Slack will
-            # throw an error if we use 0.0 on an account without infinite data
-            # retention
-            oldest=str(start) if start else None,
+            # Use the calculated actual_start
+            oldest=str(actual_start),
             latest=str(end),
         ):
             documents.append(document)
